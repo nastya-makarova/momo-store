@@ -1,0 +1,63 @@
+cache:
+  paths:
+    - .npm/
+
+variables:
+  VERSION: 1.0.${CI_PIPELINE_ID}
+
+include:
+  - template: Security/SAST.gitlab-ci.yml
+  - project: 'templates/ci'
+    file: 'DockerInDockerTemplate.yml'
+
+stages:
+  - build
+  - test
+  - release
+
+build-frontend:
+  stage: build
+  image: docker:20.10.12-dind-rootless
+  before_script:
+    - until docker info; do sleep 1; done
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  script:
+    - cd frontend
+    - >
+      docker build
+      --build-arg VERSION=$VERSION
+      --tag $CI_REGISTRY_IMAGE/frontend:$CI_COMMIT_SHA
+      .
+    - docker push $CI_REGISTRY_IMAGE/frontend:$CI_COMMIT_SHA
+
+gosec-sast:
+  stage: test
+  rules:
+    - when: never
+
+sonarqube-sast:
+  stage: test
+  image: sonarsource/sonar-scanner-cli:latest
+  script:
+    - cd frontend
+    - >
+      sonar-scanner
+      -Dsonar.projectName=${SONAR_NAME_FRONT}
+      -Dsonar.projectKey=${SONAR_FRONT_PK}
+      -Dsonar.sources=. 
+      -Dsonar.host.url=${SONAR_URL}
+      -Dsonar.login=${SONAR_FRONT_TOKEN}
+  allow_failure: true    
+      
+upload-frontend-latest:
+  variables:
+    GIT_STRATEGY: none
+  image: docker:20.10.12-dind-rootless
+  stage: release
+  before_script:
+    - until docker info; do sleep 1; done
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  script:
+    - docker pull $CI_REGISTRY_IMAGE/frontend:$CI_COMMIT_SHA
+    - docker tag $CI_REGISTRY_IMAGE/frontend:$CI_COMMIT_SHA $CI_REGISTRY_IMAGE/frontend:latest
+    - docker push $CI_REGISTRY_IMAGE/frontend:latest  

@@ -1,0 +1,34 @@
+global:
+  environment: production
+  revisionHistoryLimit: 15
+  imagePullPolicy: IfNotPresent
+  repo: gitlab.praktikum-services.ru:5050/std-015-36/momo-store/
+  imageTag: latest
+
+backend:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 20%
+  backendPort: 8081
+  imageName: backend
+
+
+frontend:
+  frontendPort: 80
+  proxy:
+    host: backend
+    port: 8081
+  imageName: frontend
+
+
+ingress:
+  email: nastasia.konovalova@yandex.ru
+  ingressHost: store.std-015-36-momostore.ru
+  frontendPort: 80
+  grafanaHost: grafana.std-015-36-momostore.ru
+  grafanaPort: 80
+
+    

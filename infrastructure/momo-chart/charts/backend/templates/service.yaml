@@ -1,0 +1,15 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Chart.Name }}
+  labels:
+    app: {{ .Chart.Name }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.backendPort }}
+      protocol: TCP
+      targetPort: {{ .Values.backendPort }}
+  selector:
+    app: {{ .Chart.Name }}

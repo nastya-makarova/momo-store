@@ -1,0 +1,32 @@
+stages:
+  - release
+  - deploy
+
+nexus-release:
+  stage: release
+  image: alpine/helm:3.12.3
+  script:
+    - cd infrastructure
+    - helm package ./momo-chart
+    - curl -u $NEXUS_USER:$NEXUS_PASS $NEXUS_REPO --upload-file *.tgz
+
+kubernetes-deploy:
+  stage: deploy
+  image: alpine/k8s:1.25.12
+  before_script:
+    - mkdir -p /tmp/.kube
+    - mkdir -p /tmp/.docker
+    - cat "$DOCKERCONFIG" | base64 -d > /tmp/.docker/config.json
+    - cat "$KUBECONFIG" | base64 -d > /tmp/.kube/config
+    - kubectl delete secret docker-config-secret-backend --kubeconfig /tmp/.kube/config || true
+    - kubectl delete secret docker-config-secret-frontend --kubeconfig /tmp/.kube/config || true
+  script:
+    - cd infrastructure
+    - kubectl create secret generic docker-config-secret-backend --from-file=.dockerconfigjson="/tmp/.docker/config.json" --type=kubernetes.io/dockerconfigjson --kubeconfig /tmp/.kube/config
+    - kubectl create secret generic docker-config-secret-frontend --from-file=.dockerconfigjson="/tmp/.docker/config.json" --type=kubernetes.io/dockerconfigjson --kubeconfig /tmp/.kube/config
+    - helm upgrade --install momo-store ./momo-chart --kubeconfig /tmp/.kube/config 
+    - rm /tmp/.kube/config
+    - rm /tmp/.docker/config.json
+  environment:
+    name: $CI_COMMIT_REF_SLUG
+    url: http://store.std-015-36-momostore.ru
